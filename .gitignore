@@ -1,0 +1,15 @@
+# Local env files containing sensitive credentials
+.env
+.env.local
+
+# Python caches
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Streamlit config
+.streamlit/
+
+# OS files
+.DS_Store
+Thumbs.db
