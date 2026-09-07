@@ -17,7 +17,7 @@ from pykrx.website.comm.auth import build_krx_session, set_auth_session
 load_dotenv()
 
 # 웹 페이지 레이아웃 설정
-st.set_page_config(page_title="한국증시 개별종목 공매도 현황 대시보드", layout="wide")
+st.set_page_config(page_title="한국증시 개별종목 공매도 현황", layout="wide")
 
 # -----------------------------------------------------------------------------
 # 1. 날짜 연산 함수
