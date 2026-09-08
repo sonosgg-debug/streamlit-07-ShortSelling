@@ -137,6 +137,8 @@ def fetch_and_process_data(start_date, end_date, ticker):
 # -----------------------------------------------------------------------------
 st.markdown("<h1 style='color: #8AB4F8; margin-bottom: 10px;'>한국증시 개별종목 공매도 현황</h1>", unsafe_allow_html=True)
 st.markdown("<p style='color: #BDC1C6; font-size: 1.0rem; margin-bottom: 20px;'>KRX 거래소 계정 정보를 이용하여 개별 종목의 공매도 순보유잔고와 주가 추이를 분석합니다.</p>", unsafe_allow_html=True)
+st.markdown("<hr style='border: 0; height: 1px; background-color: #334155; margin-bottom: 22px;'>", unsafe_allow_html=True)
+
 
 # 사이드바 설정
 st.sidebar.header("🔑 KRX 로그인 설정")
