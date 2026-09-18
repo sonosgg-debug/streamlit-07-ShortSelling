@@ -363,7 +363,8 @@ else:
 
 # 기간 선택
 periods = ["1W", "2W", "1M", "3M", "6M", "1Y", "YTD"]
-selected_period = st.sidebar.selectbox("조회 기간", periods, index=0)
+default_period_idx = periods.index("3M") if "3M" in periods else 0
+selected_period = st.sidebar.selectbox("조회 기간", periods, index=default_period_idx)
 
 # 조회 버튼
 st.sidebar.markdown("")
