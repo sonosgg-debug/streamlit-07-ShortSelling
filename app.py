@@ -101,6 +101,38 @@ st.markdown("""
         font-size: 1.35rem !important;
     }
 
+    /* 알림 및 뱃지 스타일 */
+    .status-card {
+        background-color: #1e293b;
+        border: 1px solid #334155;
+        border-left: 4px solid #38bdf8;
+        border-radius: 8px;
+        padding: 14px 18px;
+        margin-bottom: 16px;
+        font-size: 0.9rem;
+        line-height: 1.5;
+        color: #cbd5e1;
+    }
+    .status-card b {
+        color: #f8fafc;
+    }
+    .status-badge-ok {
+        background-color: rgba(34, 197, 94, 0.15);
+        color: #4ade80;
+        border: 1px solid rgba(34, 197, 94, 0.3);
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    .status-badge-wait {
+        background-color: rgba(234, 179, 8, 0.15);
+        color: #facc15;
+        border: 1px solid rgba(234, 179, 8, 0.3);
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -169,8 +201,8 @@ def load_stock_tickers():
         st.error(f"종목 리스트 로드 실패: {e}")
         return pd.DataFrame()
 
-def fetch_and_process_data(start_date, end_date, ticker):
-    """주가 데이터와 공매도 잔고 데이터를 병합하여 반환"""
+def fetch_and_process_balance_data(start_date, end_date, ticker):
+    """[33001] 개별종목 공매도 순보유잔고 및 주가 병합"""
     try:
         # 1. 주가 데이터 (OHLCV) 가져오기
         df_price = stock.get_market_ohlcv_by_date(start_date, end_date, ticker)
@@ -190,9 +222,11 @@ def fetch_and_process_data(start_date, end_date, ticker):
         df_combined = df_price[['종가']].rename(columns={'종가': '주가'}).join(df_short, how='left')
         
         # 4. 공매도 순보유 잔고금액 (억원) 계산 및 컬럼 정리
-        # '공매도금액' 컬럼이 순보유 잔고금액에 대응함 (원 -> 억원)
-        if '공매도금액' in df_combined.columns:
-            df_combined['공매도 순보유 잔고금액 (억원)'] = df_combined['공매도금액'] / 100_000_000.0
+        short_amt_cols = [c for c in df_short.columns if '금액' in c or '공매도금액' in c]
+        if short_amt_cols:
+            df_combined['공매도 순보유 잔고금액 (억원)'] = df_combined[short_amt_cols[0]] / 100_000_000.0
+        elif len(df_short.columns) >= 3:
+            df_combined['공매도 순보유 잔고금액 (억원)'] = df_combined.iloc[:, 3] / 100_000_000.0
         else:
             df_combined['공매도 순보유 잔고금액 (억원)'] = np.nan
             
@@ -204,19 +238,74 @@ def fetch_and_process_data(start_date, end_date, ticker):
         }
         df_combined.rename(columns=rename_cols, inplace=True)
         
-        # 수집 범위 정보 메시지 구성
-        price_range = f"{df_price.index[0].strftime('%Y-%m-%d')} ~ {df_price.index[-1].strftime('%Y-%m-%d')}"
+        # 메타 정보 추출
         valid_short = df_combined[df_combined['공매도 순보유 잔고금액 (억원)'].notna()]
-        if not valid_short.empty:
-            short_range = f"{valid_short.index[0].strftime('%Y-%m-%d')} ~ {valid_short.index[-1].strftime('%Y-%m-%d')}"
-        else:
-            short_range = "데이터 없음"
-            
-        info_msg = f'<div style="font-size: 0.8rem; color: #BDC1C6; line-height: 1.4; margin-bottom: 5px;">📈 <b>주가 데이터 범위</b>: {price_range}<br/>📉 <b>공매도 데이터 범위</b> (T+2 지연반영): {short_range}</div>'
+        latest_short_date = valid_short.index[-1] if not valid_short.empty else None
+        latest_price_date = df_price.index[-1]
         
-        return df_combined, info_msg, None
+        missing_dates = [d for d in df_price.index if d > latest_short_date] if latest_short_date is not None else []
+        
+        meta = {
+            'price_start': df_price.index[0],
+            'price_end': latest_price_date,
+            'short_start': valid_short.index[0] if not valid_short.empty else None,
+            'short_end': latest_short_date,
+            'missing_dates': missing_dates,
+            'has_gap': len(missing_dates) > 0
+        }
+        
+        return df_combined, meta, None
     except Exception as e:
         return pd.DataFrame(), None, f"데이터 로드 중 예외가 발생했습니다: {e}"
+
+def fetch_and_process_trading_data(start_date, end_date, ticker):
+    """[12002] 일별 공매도 거래실적(거래대금/거래량) 및 주가 병합"""
+    try:
+        # 1. 주가 데이터 (OHLCV)
+        df_price = stock.get_market_ohlcv_by_date(start_date, end_date, ticker)
+        if df_price.empty:
+            return pd.DataFrame(), None, "주가 데이터가 존재하지 않습니다."
+            
+        # 2. 거래실적 가져오기
+        df_val = stock.get_shorting_value_by_date(start_date, end_date, ticker)
+        df_vol = stock.get_shorting_volume_by_date(start_date, end_date, ticker)
+        
+        df_price.index = pd.to_datetime(df_price.index)
+        df_val.index = pd.to_datetime(df_val.index)
+        df_vol.index = pd.to_datetime(df_vol.index)
+        
+        df_trading = df_price[['종가']].rename(columns={'종가': '주가'})
+        
+        # 컬럼 인덱스를 활용하여 인코딩 이슈 방지 (0: 매도/공매도, 1: 매수/총합, 2: 비중)
+        if not df_val.empty and len(df_val.columns) >= 3:
+            df_trading['공매도 거래대금 (억원)'] = df_val.iloc[:, 0] / 100_000_000.0
+            df_trading['총 거래대금 (억원)'] = df_val.iloc[:, 1] / 100_000_000.0
+            df_trading['공매도 거래대금 비중 (%)'] = df_val.iloc[:, 2]
+        else:
+            df_trading['공매도 거래대금 (억원)'] = np.nan
+            df_trading['총 거래대금 (억원)'] = np.nan
+            df_trading['공매도 거래대금 비중 (%)'] = np.nan
+            
+        if not df_vol.empty and len(df_vol.columns) >= 3:
+            df_trading['공매도 거래량 (주)'] = df_vol.iloc[:, 0]
+            df_trading['총 거래량 (주)'] = df_vol.iloc[:, 1]
+            df_trading['공매도 거래량 비중 (%)'] = df_vol.iloc[:, 2]
+        else:
+            df_trading['공매도 거래량 (주)'] = np.nan
+            df_trading['총 거래량 (주)'] = np.nan
+            df_trading['공매도 거래량 비중 (%)'] = np.nan
+            
+        meta = {
+            'trading_start': df_trading.index[0],
+            'trading_end': df_trading.index[-1]
+        }
+        return df_trading, meta, None
+    except Exception as e:
+        return pd.DataFrame(), None, f"거래실적 데이터 로드 중 예외가 발생했습니다: {e}"
+
+def fetch_and_process_data(start_date, end_date, ticker):
+    """하위 호환용 래퍼 함수"""
+    return fetch_and_process_balance_data(start_date, end_date, ticker)
 
 # -----------------------------------------------------------------------------
 # 4. 메인 화면 구성
@@ -289,102 +378,245 @@ if login_success:
     
     st.markdown(f"<h3 style='color: #BDC1C6; font-size: 1.25rem; font-weight: 600; margin-top: 10px; margin-bottom: 10px;'>{selected_name} ({selected_ticker}) - {selected_period} 공매도 분석</h3>", unsafe_allow_html=True)
     
-    with st.spinner("KRX 데이터를 로드하고 있습니다..."):
-        df, info_msg, err_msg = fetch_and_process_data(start_date, end_date, selected_ticker)
-        
-    if err_msg:
-        st.error(err_msg)
-        st.info("💡 팁: KRX 로그인 정보가 일치하지 않거나 세션이 만료된 경우 발생할 수 있습니다.")
-    elif not df.empty:
-        # 데이터 수집 범위 렌더링
-        if info_msg:
-            st.markdown(info_msg, unsafe_allow_html=True)
-            st.markdown("")
+    tab_balance, tab_trading = st.tabs([
+        "📊 공매도 순보유잔고 (T+2 지연공시)", 
+        "📈 일별 공매도 거래현황 (최신 거래대금/거래량)"
+    ])
+    
+    # =========================================================================
+    # TAB 1: 공매도 순보유잔고
+    # =========================================================================
+    with tab_balance:
+        with st.spinner("공매도 잔고 데이터를 로드하고 있습니다..."):
+            df_bal, meta_bal, err_bal = fetch_and_process_balance_data(start_date, end_date, selected_ticker)
             
-        # Plotly 이중 Y축 차트 그리기 (둘 다 꺾은선 그래프)
-        fig = make_subplots(specs=[[{"secondary_y": True}]])
-        
-        # 1. 주가 (좌측 Y축, 꺾은선)
-        fig.add_trace(
-            go.Scatter(
-                x=df.index.strftime('%Y-%m-%d'),
-                y=df['주가'],
-                name="주가 (종가)",
-                mode='lines+markers',
-                line=dict(color='#1f77b4', width=2), # 파란색 계열
-                marker=dict(size=6),
-                hovertemplate='%{x} 주가: %{y:,.0f} 원<extra></extra>'
-            ),
-            secondary_y=False
-        )
-        
-        # 2. 공매도 순보유 잔고금액 (우측 Y축, 꺾은선)
-        fig.add_trace(
-            go.Scatter(
-                x=df.index.strftime('%Y-%m-%d'),
-                y=df['공매도 순보유 잔고금액 (억원)'],
-                name="공매도 순보유 잔고금액 (억원)",
-                mode='lines+markers',
-                line=dict(color='#ff7f0e', width=2), # 주황색 계열
-                marker=dict(size=6),
-                hovertemplate='%{x} 공매도 순보유 잔고금액: %{y:.2f} 억원<extra></extra>'
-            ),
-            secondary_y=True
-        )
-        
-        # 레이아웃 설정
-        fig.update_layout(
-            title_text=f"{selected_name} 주가 및 공매도 순보유 잔고금액 추이",
-            title_x=0.5,
-            title_xanchor="center",
-            hovermode="x unified",
-            legend=dict(
-                orientation="h",
-                yanchor="bottom",
-                y=1.02,
-                xanchor="center",
-                x=0.5
-            ),
-            margin=dict(l=20, r=20, t=80, b=20),
-            height=480
-        )
-        
-        fig.update_xaxes(title_text="날짜", type='category', tickangle=-45)
-        fig.update_yaxes(title_text="주가 (원)", tickformat=",.0f", secondary_y=False)
-        fig.update_yaxes(title_text="공매도 순보유 잔고금액 (억원)", tickformat=",.2f", secondary_y=True)
-        
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # 일별 데이터 상세 테이블
-        st.markdown("<h4 style='color: #BDC1C6; font-size: 1.05rem; font-weight: 600; margin-top: 20px; margin-bottom: 10px;'>📝 일별 데이터 상세</h4>", unsafe_allow_html=True)
-        
-        # 표시할 컬럼 선정
-        display_cols = [
-            '주가', 
-            '공매도 순보유 잔고금액 (억원)', 
-            '공매도 순보유 잔고수량 (주)', 
-            '공매도 비중 (%)', 
-            '상장주식수 (주)'
-        ]
-        
-        # 존재하는 컬럼만 노출
-        valid_display_cols = [c for c in display_cols if c in df.columns]
-        df_display = df[valid_display_cols].copy()
-        df_display.index = df_display.index.strftime('%Y-%m-%d')
-        
-        # 포맷 설정 (NaN 값은 '-'로 표시)
-        styled_display = df_display.sort_index(ascending=False).style.format({
-            '주가': '{:,.0f}',
-            '공매도 순보유 잔고금액 (억원)': '{:.2f}',
-            '공매도 순보유 잔고수량 (주)': '{:,.0f}',
-            '공매도 비중 (%)': '{:.2f}',
-            '상장주식수 (주)': '{:,.0f}'
-        }, na_rep='-')
-        
-        st.dataframe(styled_display, use_container_width=True)
-        
-    else:
-        st.warning("데이터가 비어 있습니다. 기간 설정 또는 종목을 변경해 다시 시도하세요.")
+        if err_bal:
+            st.error(err_bal)
+            st.info("💡 팁: KRX 로그인 정보가 일치하지 않거나 세션이 만료된 경우 발생할 수 있습니다.")
+        elif not df_bal.empty:
+            # T+2 공시 일정 안내 카드 렌더링
+            latest_short_str = meta_bal['short_end'].strftime('%Y-%m-%d') if meta_bal['short_end'] is not None else "데이터 없음"
+            latest_price_str = meta_bal['price_end'].strftime('%Y-%m-%d')
+            
+            if meta_bal['has_gap']:
+                missing_str = ", ".join([d.strftime('%m/%d') for d in meta_bal['missing_dates']])
+                next_target = meta_bal['missing_dates'][0].strftime('%Y-%m-%d')
+                
+                st.markdown(f"""
+                <div class="status-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span>📡 <b>KRX 공매도 잔고 수집 상태</b>: 최신 반영일 <span class="status-badge-ok">{latest_short_str}</span> (정상 수집 중)</span>
+                        <span class="status-badge-wait">T+2 법정 공시 대기: {missing_str}</span>
+                    </div>
+                    <div style="color: #94a3b8; font-size: 0.85rem; line-height: 1.5;">
+                        • <b>T+2 결제 및 공시 주기 안내</b>: 자본시장법 시행령 제208조의2에 따라 공매도 순보유잔고는 체결일(T)로부터 <b>2영업일 뒤(T+2) 18:00</b>에 거래소에서 공시됩니다.<br/>
+                        • 따라서 최근 2~3영업일 잔고가 비어 있는 것은 <b>수집 오류가 아닌 정상적인 공시 대기 상태</b>이며, <b>{next_target}</b> 잔고는 T+2일 18:00 이후 KRX 공시를 통해 자동 반영됩니다.<br/>
+                        • 최신(어제/오늘) 공매도 체결 내역을 확인하시려면 상단의 <b>[일별 공매도 거래현황]</b> 탭을 확인해 주세요.
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown(f"""
+                <div class="status-card">
+                    📡 <b>KRX 공매도 잔고 수집 상태</b>: 최신 공시일 <span class="status-badge-ok">{latest_short_str}</span>까지 모두 수집 완료되었습니다.
+                </div>
+                """, unsafe_allow_html=True)
+                
+            # 차트 표시 범위 정렬 옵션
+            col_opt, _ = st.columns([3, 1])
+            with col_opt:
+                align_chart = st.checkbox(
+                    f"공매도 잔고 공시 완료일({latest_short_str})까지만 차트 표시 (권장: 선 끊김 방지)",
+                    value=True,
+                    help="체크 시 주가와 공매도 잔고의 종료 날짜를 공시 완료일로 일치시켜 선 단절 없이 깔끔하게 비교합니다."
+                )
+                
+            df_plot = df_bal.copy()
+            if align_chart and meta_bal['short_end'] is not None:
+                df_plot = df_plot[df_plot.index <= meta_bal['short_end']]
+                
+            # Plotly 이중 Y축 차트 그리기
+            fig_bal = make_subplots(specs=[[{"secondary_y": True}]])
+            
+            # 1. 주가 (좌측 Y축, 꺾은선)
+            fig_bal.add_trace(
+                go.Scatter(
+                    x=df_plot.index.strftime('%Y-%m-%d'),
+                    y=df_plot['주가'],
+                    name="주가 (종가)",
+                    mode='lines+markers',
+                    line=dict(color='#1f77b4', width=2),
+                    marker=dict(size=6),
+                    hovertemplate='%{x} 주가: %{y:,.0f} 원<extra></extra>'
+                ),
+                secondary_y=False
+            )
+            
+            # 2. 공매도 순보유 잔고금액 (우측 Y축, 꺾은선)
+            fig_bal.add_trace(
+                go.Scatter(
+                    x=df_plot.index.strftime('%Y-%m-%d'),
+                    y=df_plot['공매도 순보유 잔고금액 (억원)'],
+                    name="공매도 순보유 잔고금액 (억원)",
+                    mode='lines+markers',
+                    line=dict(color='#ff7f0e', width=2),
+                    marker=dict(size=6),
+                    hovertemplate='%{x} 공매도 잔고금액: %{y:.2f} 억원<extra></extra>'
+                ),
+                secondary_y=True
+            )
+            
+            fig_bal.update_layout(
+                title_text=f"{selected_name} 주가 및 공매도 순보유 잔고금액 추이",
+                title_x=0.5,
+                title_xanchor="center",
+                hovermode="x unified",
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="center",
+                    x=0.5
+                ),
+                margin=dict(l=20, r=20, t=80, b=20),
+                height=480
+            )
+            fig_bal.update_xaxes(title_text="날짜", type='category', tickangle=-45)
+            fig_bal.update_yaxes(title_text="주가 (원)", tickformat=",.0f", secondary_y=False)
+            fig_bal.update_yaxes(title_text="공매도 순보유 잔고금액 (억원)", tickformat=",.2f", secondary_y=True)
+            
+            st.plotly_chart(fig_bal, use_container_width=True)
+            
+            # 일별 데이터 상세 테이블
+            st.markdown("<h4 style='color: #BDC1C6; font-size: 1.05rem; font-weight: 600; margin-top: 20px; margin-bottom: 5px;'>📝 공매도 순보유잔고 일별 상세</h4>", unsafe_allow_html=True)
+            st.markdown("<div style='font-size: 0.8rem; color: #94a3b8; margin-bottom: 12px;'>※ 최근 일자의 결측치('-')는 거래소 T+2 공시 대기 중인 정상 상태입니다.</div>", unsafe_allow_html=True)
+            
+            display_cols_bal = [
+                '주가', 
+                '공매도 순보유 잔고금액 (억원)', 
+                '공매도 순보유 잔고수량 (주)', 
+                '공매도 비중 (%)', 
+                '상장주식수 (주)'
+            ]
+            valid_cols_bal = [c for c in display_cols_bal if c in df_bal.columns]
+            df_bal_display = df_bal[valid_cols_bal].copy()
+            df_bal_display.index = df_bal_display.index.strftime('%Y-%m-%d')
+            
+            styled_bal = df_bal_display.sort_index(ascending=False).style.format({
+                '주가': '{:,.0f}',
+                '공매도 순보유 잔고금액 (억원)': '{:.2f}',
+                '공매도 순보유 잔고수량 (주)': '{:,.0f}',
+                '공매도 비중 (%)': '{:.2f}',
+                '상장주식수 (주)': '{:,.0f}'
+            }, na_rep='-')
+            
+            st.dataframe(styled_bal, use_container_width=True)
+        else:
+            st.warning("공매도 잔고 데이터가 비어 있습니다.")
+
+    # =========================================================================
+    # TAB 2: 일별 공매도 거래현황 (최신 거래대금/거래량)
+    # =========================================================================
+    with tab_trading:
+        with st.spinner("일별 공매도 거래실적 데이터를 로드하고 있습니다..."):
+            df_tr, meta_tr, err_tr = fetch_and_process_trading_data(start_date, end_date, selected_ticker)
+            
+        if err_tr:
+            st.error(err_tr)
+        elif not df_tr.empty:
+            latest_trading_str = meta_tr['trading_end'].strftime('%Y-%m-%d')
+            
+            st.markdown(f"""
+            <div class="status-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span>⚡ <b>일별 공매도 거래실적</b>: 최신 반영일 <span class="status-badge-ok">{latest_trading_str}</span> (당일 장 마감 후 즉시 공시)</span>
+                </div>
+                <div style="color: #94a3b8; font-size: 0.85rem; line-height: 1.5;">
+                    • <b>실시간 반영 안내</b>: 일별 공매도 거래대금과 거래량은 T+2 잔고 공시와 달리 <b>매일 장 마감 후 거래소에서 즉시 집계</b>되어 공시됩니다.<br/>
+                    • 따라서 최근 거래일의 공매도 유입 강도 및 거래대금 비중을 지연 없이 가장 빠르게 파악하실 수 있습니다.
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Plotly 차트: 주가(선) + 공매도 거래대금(막대)
+            fig_tr = make_subplots(specs=[[{"secondary_y": True}]])
+            
+            # 1. 주가 (좌측 Y축, 선)
+            fig_tr.add_trace(
+                go.Scatter(
+                    x=df_tr.index.strftime('%Y-%m-%d'),
+                    y=df_tr['주가'],
+                    name="주가 (종가)",
+                    mode='lines+markers',
+                    line=dict(color='#1f77b4', width=2),
+                    marker=dict(size=6),
+                    hovertemplate='%{x} 주가: %{y:,.0f} 원<extra></extra>'
+                ),
+                secondary_y=False
+            )
+            
+            # 2. 공매도 거래대금 (우측 Y축, 바)
+            fig_tr.add_trace(
+                go.Bar(
+                    x=df_tr.index.strftime('%Y-%m-%d'),
+                    y=df_tr['공매도 거래대금 (억원)'],
+                    name="공매도 거래대금 (억원)",
+                    marker=dict(color='rgba(255, 127, 14, 0.75)', line=dict(color='#ff7f0e', width=1)),
+                    hovertemplate='%{x} 공매도 거래대금: %{y:.2f} 억원<extra></extra>'
+                ),
+                secondary_y=True
+            )
+            
+            fig_tr.update_layout(
+                title_text=f"{selected_name} 주가 및 일별 공매도 거래대금 추이",
+                title_x=0.5,
+                title_xanchor="center",
+                hovermode="x unified",
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="center",
+                    x=0.5
+                ),
+                margin=dict(l=20, r=20, t=80, b=20),
+                height=480
+            )
+            fig_tr.update_xaxes(title_text="날짜", type='category', tickangle=-45)
+            fig_tr.update_yaxes(title_text="주가 (원)", tickformat=",.0f", secondary_y=False)
+            fig_tr.update_yaxes(title_text="공매도 거래대금 (억원)", tickformat=",.2f", secondary_y=True)
+            
+            st.plotly_chart(fig_tr, use_container_width=True)
+            
+            # 일별 공매도 거래 상세 테이블
+            st.markdown("<h4 style='color: #BDC1C6; font-size: 1.05rem; font-weight: 600; margin-top: 20px; margin-bottom: 5px;'>📝 일별 공매도 거래실적 상세</h4>", unsafe_allow_html=True)
+            
+            display_cols_tr = [
+                '주가', 
+                '공매도 거래대금 (억원)', 
+                '공매도 거래대금 비중 (%)',
+                '총 거래대금 (억원)', 
+                '공매도 거래량 (주)', 
+                '총 거래량 (주)', 
+                '공매도 거래량 비중 (%)'
+            ]
+            valid_cols_tr = [c for c in display_cols_tr if c in df_tr.columns]
+            df_tr_display = df_tr[valid_cols_tr].copy()
+            df_tr_display.index = df_tr_display.index.strftime('%Y-%m-%d')
+            
+            styled_tr = df_tr_display.sort_index(ascending=False).style.format({
+                '주가': '{:,.0f}',
+                '공매도 거래대금 (억원)': '{:.2f}',
+                '공매도 거래대금 비중 (%)': '{:.2f}',
+                '총 거래대금 (억원)': '{:.2f}',
+                '공매도 거래량 (주)': '{:,.0f}',
+                '총 거래량 (주)': '{:,.0f}',
+                '공매도 거래량 비중 (%)': '{:.2f}'
+            }, na_rep='-')
+            
+            st.dataframe(styled_tr, use_container_width=True)
+        else:
+            st.warning("일별 공매도 거래실적 데이터가 비어 있습니다.")
 else:
     st.info("👈 대시보드 조회를 위해 사이드바에 KRX 로그인 정보를 입력해 주세요.")
     st.markdown("""
