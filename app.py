@@ -22,6 +22,14 @@ st.set_page_config(page_title="한국증시 개별종목 공매도 현황", layo
 # 사이드바 접기/펼치기 버튼 상시 표시 및 모바일 대비 강화 CSS
 st.markdown("""
 <style>
+    /* Headers & Main Title (00 Bookmarks 테마 일치) */
+    h1, .main h1, [data-testid="stHeadingWithActionElements"] h1, .main-title {
+        color: #8AB4F8 !important;
+        -webkit-text-fill-color: #8AB4F8 !important;
+        font-size: 1.9rem !important;
+        font-weight: 800 !important;
+        text-align: center !important;
+    }
 
     /* =========================================================
        사이드바 접기(<<) 및 펼치기(>>) 버튼 항상 표시 및 시인성/대비 강화
@@ -310,7 +318,7 @@ def fetch_and_process_data(start_date, end_date, ticker):
 # -----------------------------------------------------------------------------
 # 4. 메인 화면 구성
 # -----------------------------------------------------------------------------
-st.markdown("<h1 style='text-align: center; font-size: 1.9rem !important; font-weight: 800 !important; color: #8AB4F8 !important; -webkit-text-fill-color: #8AB4F8 !important; margin-bottom: 10px;'><span style='color: #8AB4F8 !important;'>한국증시 개별종목 공매도 현황</span></h1>", unsafe_allow_html=True)
+st.markdown("<h1 class='main-title' style='text-align: center; font-size: 1.9rem !important; font-weight: 800 !important; color: #8AB4F8 !important; -webkit-text-fill-color: #8AB4F8 !important; margin-bottom: 10px;'><span style='color: #8AB4F8 !important; -webkit-text-fill-color: #8AB4F8 !important;'>한국증시 개별종목 공매도 현황</span></h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; color: #BDC1C6; font-size: 1.0rem; margin-bottom: 20px;'>KRX 거래소 계정 정보를 이용하여 개별 종목의 공매도 순보유잔고와 주가 추이를 분석합니다.</p>", unsafe_allow_html=True)
 st.markdown("<hr style='border: 0; height: 1px; background-color: #334155; margin-bottom: 22px;'>", unsafe_allow_html=True)
 
