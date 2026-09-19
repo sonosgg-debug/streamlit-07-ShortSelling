@@ -31,6 +31,24 @@ st.markdown("""
         text-align: center !important;
     }
 
+    /* Button Styling (39 DividendStock 표준 스타일 일치) */
+    .stButton button[kind="primary"],
+    .stButton > button[kind="primary"],
+    section[data-testid="stSidebar"] button[kind="primary"] {
+        background-color: #2563eb !important;
+        color: #ffffff !important;
+        border: none !important;
+        font-weight: 600 !important;
+        border-radius: 6px !important;
+        transition: all 0.2s ease !important;
+    }
+    .stButton button[kind="primary"]:hover,
+    .stButton > button[kind="primary"]:hover,
+    section[data-testid="stSidebar"] button[kind="primary"]:hover {
+        background-color: #1d4ed8 !important;
+        box-shadow: 0 0 10px rgba(37, 99, 235, 0.4) !important;
+    }
+
     /* =========================================================
        사이드바 접기(<<) 및 펼치기(>>) 버튼 항상 표시 및 시인성/대비 강화
        ========================================================= */
@@ -376,7 +394,7 @@ selected_period = st.sidebar.selectbox("조회 기간", periods, index=default_p
 
 # 조회 버튼
 st.sidebar.markdown("")
-submit_button = st.sidebar.button("📊 조회하기", use_container_width=True)
+submit_button = st.sidebar.button("🔍 조회", type="primary", use_container_width=True)
 
 # -----------------------------------------------------------------------------
 # 5. 데이터 조회 및 시각화 영역
