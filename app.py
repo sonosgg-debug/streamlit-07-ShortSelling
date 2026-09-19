@@ -17,16 +17,23 @@ from pykrx.website.comm.auth import build_krx_session, set_auth_session
 load_dotenv()
 
 # 웹 페이지 레이아웃 설정
-st.set_page_config(page_title="한국증시 개별종목 공매도 현황", layout="wide")
+st.set_page_config(page_title="한국증시 개별종목 공매도 현황", layout="wide", initial_sidebar_state="expanded")
 
 # 사이드바 접기/펼치기 버튼 상시 표시 및 모바일 대비 강화 CSS
 st.markdown("""
 <style>
+    /* 메인 콘텐츠 상단 여백 규격화 */
+    .main .block-container,
+    [data-testid="stMainBlockContainer"],
+    .block-container {
+        padding-top: 2.0rem !important;
+    }
+
     /* Headers & Main Title (00 Bookmarks 테마 일치) */
     h1, .main h1, [data-testid="stHeadingWithActionElements"] h1, .main-title {
         color: #8AB4F8 !important;
         -webkit-text-fill-color: #8AB4F8 !important;
-        font-size: 1.9rem !important;
+        font-size: 2.0rem !important;
         font-weight: 800 !important;
         text-align: center !important;
     }
@@ -658,3 +665,6 @@ else:
     KRX_PW=your_password
     ```
     """)
+
+st.markdown("---")
+st.markdown("<div style='text-align: center; color: #64748b; font-size: 0.8rem; margin-top: 8px; margin-bottom: 24px; line-height: 1.6;'>⚠️ 본 서비스에서 제공하는 모든 정보는 투자 참고용이며, 투자의 최종 결정과 책임은 투자자 본인에게 있습니다.</div>", unsafe_allow_html=True)
