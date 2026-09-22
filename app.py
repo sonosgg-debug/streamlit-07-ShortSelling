@@ -1,3 +1,6 @@
+import socket
+socket.setdefaulttimeout(5.0)
+
 import streamlit as st
 import datetime
 import pandas as pd
@@ -223,16 +226,58 @@ def try_krx_login(login_id, login_pw):
 # -----------------------------------------------------------------------------
 # 3. 데이터 로드 및 정제 모듈 (캐싱 지원)
 # -----------------------------------------------------------------------------
-@st.cache_data
+@st.cache_data(ttl=86400)
 def load_stock_tickers():
-    """상장 종목 전체 리스트 가져오기 (비로그인 상태로도 작동 가능)"""
+    """상장 종목 전체 리스트 가져오기 (로컬 CSV -> pykrx StockTicker -> FDR -> 내장 대표주)"""
+    csv_path = os.path.join(os.path.dirname(__file__), "krx_tickers.csv")
+
+    # 1. 로컬 krx_tickers.csv 최우선 로드 (해외 IP 차단/네트워크 지연 원천 차단)
+    if os.path.exists(csv_path):
+        try:
+            df = pd.read_csv(csv_path, dtype={'티커': str}, index_col='티커')
+            if not df.empty and '종목' in df.columns:
+                return df
+        except Exception:
+            pass
+
+    # 2. pykrx StockTicker 시도
     try:
         st_ticker = StockTicker()
         df = st_ticker.listed
+        if not df.empty and '종목' in df.columns:
+            try:
+                df.to_csv(csv_path, encoding='utf-8-sig')
+            except Exception:
+                pass
+            return df
+    except Exception:
+        pass
+
+    # 3. Fallback to FinanceDataReader
+    try:
+        import FinanceDataReader as fdr
+        df = fdr.StockListing('KRX')
+        df = df.set_index('Code')
+        df['종목'] = df['Name']
         return df
-    except Exception as e:
-        st.error(f"종목 리스트 로드 실패: {e}")
-        return pd.DataFrame()
+    except Exception:
+        pass
+
+    # 4. 내장 대표 32개 우량주 fallback (최악의 오프라인/네트워크 차단 환경 대비)
+    fallback_data = {
+        '005930': '삼성전자', '000660': 'SK하이닉스', '373220': 'LG에너지솔루션',
+        '207940': '삼성바이오로직스', '005380': '현대차', '000270': '기아',
+        '068270': '셀트리온', '105560': 'KB금융', '055550': '신한지주',
+        '035420': 'NAVER', '005490': 'POSCO홀딩스', '012330': '현대모비스',
+        '035720': '카카오', '028260': '삼성물산', '051910': 'LG화학',
+        '086520': '에코프로', '247540': '에코프로비엠', '196170': '알테오젠',
+        '036930': '주성엔지니어링', '006400': '삼성SDI', '032830': '삼성생명',
+        '015760': '한국전력', '329180': 'HD현대중공업', '010130': '고려아연',
+        '033780': 'KT&G', '003550': 'LG', '018260': '삼성에스디에스',
+        '017670': 'SK텔레콤', '030200': 'KT', '034730': 'SK',
+        '323410': '카카오뱅크', '259960': '크래프톤'
+    }
+    return pd.DataFrame(list(fallback_data.items()), columns=['티커', '종목']).set_index('티커')
 
 def fetch_and_process_balance_data(start_date, end_date, ticker):
     """[33001] 개별종목 공매도 순보유잔고 및 주가 병합"""
