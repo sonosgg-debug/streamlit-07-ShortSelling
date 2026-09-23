@@ -439,59 +439,68 @@ st.markdown("<hr style='border: 0; height: 1px; background-color: #334155; margi
 
 
 # 사이드바 설정
-st.sidebar.header("🔑 KRX 로그인 설정")
+with st.sidebar:
+    st.header("🔑 KRX 로그인 설정")
 
-# env 로드 값
-env_id = os.getenv("KRX_ID", "")
-env_pw = os.getenv("KRX_PW", "")
+    # env 로드 값
+    env_id = os.getenv("KRX_ID", "")
+    env_pw = os.getenv("KRX_PW", "")
 
-# 사이드바 입력창
-krx_id = st.sidebar.text_input("KRX ID", value=env_id, help="data.krx.co.kr 로그인 아이디")
-krx_pw = st.sidebar.text_input("KRX Password", value=env_pw, type="password", help="data.krx.co.kr 로그인 비밀번호")
+    # 사이드바 입력창
+    krx_id = st.text_input("KRX ID", value=env_id, help="data.krx.co.kr 로그인 아이디")
+    krx_pw = st.text_input("KRX Password", value=env_pw, type="password", help="data.krx.co.kr 로그인 비밀번호")
 
-login_success = False
-if krx_id and krx_pw:
-    login_success = try_krx_login(krx_id, krx_pw)
-    if login_success:
-        st.sidebar.success("✔️ KRX 로그인 성공")
+    login_success = False
+    if krx_id and krx_pw:
+        login_success = try_krx_login(krx_id, krx_pw)
+        if login_success:
+            st.success("✔️ KRX 로그인 성공")
+        else:
+            st.error("❌ KRX 로그인 실패 (계정을 확인해 주세요)")
     else:
-        st.sidebar.error("❌ KRX 로그인 실패 (계정을 확인해 주세요)")
-else:
-    st.sidebar.warning("⚠️ KRX 로그인 정보 입력이 필요합니다.")
+        st.warning("⚠️ KRX 로그인 정보 입력이 필요합니다.")
 
-st.sidebar.markdown("---")
-st.sidebar.header("🔍 조회 조건")
+    st.markdown("---")
+    st.subheader("🎯 조회 조건")
 
-# 종목 로드
-tickers_df = load_stock_tickers()
-if not tickers_df.empty:
-    # selectbox 표시용 포맷팅: 종목명 (티커)
-    tickers_df['display_name'] = tickers_df['종목'] + " (" + tickers_df.index + ")"
-    display_names = sorted(tickers_df['display_name'].tolist())
-    
-    # 디폴트 종목: 삼성전자
-    default_idx = 0
-    for idx, name in enumerate(display_names):
-        if "삼성전자" in name:
-            default_idx = idx
-            break
-            
-    selected_display = st.sidebar.selectbox("종목 선택", display_names, index=default_idx)
-    # 티커 코드 추출 (마지막 괄호 안의 6자리 문자)
-    selected_ticker = selected_display.split("(")[-1].replace(")", "").strip()
-    selected_name = tickers_df.loc[selected_ticker, '종목']
-else:
-    st.sidebar.error("종목 정보를 로드할 수 없습니다.")
-    st.stop()
+    # 종목 로드
+    tickers_df = load_stock_tickers()
+    if not tickers_df.empty:
+        # selectbox 표시용 포맷팅: 종목명 (티커)
+        tickers_df['display_name'] = tickers_df['종목'] + " (" + tickers_df.index + ")"
+        display_names = sorted(tickers_df['display_name'].tolist())
+        
+        # 디폴트 종목: 삼성전자
+        default_idx = 0
+        for idx, name in enumerate(display_names):
+            if "삼성전자" in name:
+                default_idx = idx
+                break
+                
+        selected_display = st.selectbox("종목 선택", display_names, index=default_idx)
+        # 티커 코드 추출 (마지막 괄호 안의 6자리 문자)
+        selected_ticker = selected_display.split("(")[-1].replace(")", "").strip()
+        selected_name = tickers_df.loc[selected_ticker, '종목']
+    else:
+        st.error("종목 정보를 로드할 수 없습니다.")
+        st.stop()
 
-# 기간 선택
-periods = ["1W", "2W", "1M", "3M", "6M", "1Y", "YTD"]
-default_period_idx = periods.index("3M") if "3M" in periods else 0
-selected_period = st.sidebar.selectbox("조회 기간", periods, index=default_period_idx)
+    # 기간 선택
+    periods = ["1W", "2W", "1M", "3M", "6M", "1Y", "YTD"]
+    default_period_idx = periods.index("3M") if "3M" in periods else 0
+    selected_period = st.selectbox("조회 기간", periods, index=default_period_idx)
 
-# 조회 버튼
-st.sidebar.markdown("")
-submit_button = st.sidebar.button("🔍 조회", type="primary", use_container_width=True)
+    # 액션 버튼 (Update & 조회)
+    st.markdown("")
+    col_btn1, col_btn2 = st.columns(2)
+    with col_btn1:
+        btn_update = st.button("🔄 Update", use_container_width=True, help="캐시를 초기화하고 최신 공매도 데이터를 다시 수집합니다.")
+    with col_btn2:
+        submit_button = st.button("🔍 조회", type="primary", use_container_width=True, help="선택한 조건으로 대시보드를 새로고침합니다.")
+
+    if btn_update:
+        st.cache_data.clear()
+        st.rerun()
 
 # -----------------------------------------------------------------------------
 # 5. 데이터 조회 및 시각화 영역
