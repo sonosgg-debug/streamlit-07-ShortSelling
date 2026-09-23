@@ -1,4 +1,4 @@
-# Local env files containing sensitive credentials
+﻿# Local env files containing sensitive credentials
 .env
 .env.local
 
@@ -8,7 +8,9 @@ __pycache__/
 *$py.class
 
 # Streamlit config
-.streamlit/
+# Streamlit secrets (config.toml은 다크 테마 적용을 위해 git에 포함)
+.streamlit/secrets.toml
+!.streamlit/config.toml
 
 # OS files
 .DS_Store
