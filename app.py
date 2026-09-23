@@ -546,23 +546,33 @@ if login_success:
             )
             
             fig_bal.update_layout(
-                title_text=f"{selected_name} 주가 및 공매도 순보유 잔고금액 추이",
-                title_x=0.5,
-                title_xanchor="center",
+                template="plotly_dark",
+                paper_bgcolor="#1E293B",
+                plot_bgcolor="#0F172A",
+                title=dict(
+                    text=f"<b>{selected_name} 주가 및 공매도 순보유 잔고금액 추이</b>",
+                    font=dict(color="#F8FAFC", size=15),
+                    x=0.5,
+                    xanchor="center"
+                ),
                 hovermode="x unified",
                 legend=dict(
                     orientation="h",
                     yanchor="bottom",
                     y=1.02,
                     xanchor="center",
-                    x=0.5
+                    x=0.5,
+                    bgcolor="rgba(30, 41, 59, 0.85)",
+                    bordercolor="#334155",
+                    borderwidth=1,
+                    font=dict(color="#F8FAFC", size=11)
                 ),
                 margin=dict(l=20, r=20, t=80, b=20),
                 height=480
             )
-            fig_bal.update_xaxes(title_text="날짜", type='category', tickangle=-45)
-            fig_bal.update_yaxes(title_text="주가 (원)", tickformat=",.0f", secondary_y=False)
-            fig_bal.update_yaxes(title_text="공매도 순보유 잔고금액 (억원)", tickformat=",.2f", secondary_y=True)
+            fig_bal.update_xaxes(title_text="날짜", type='category', tickangle=-45, gridcolor="#334155", linecolor="#475569", tickfont=dict(color="#cbd5e1"))
+            fig_bal.update_yaxes(title_text="주가 (원)", tickformat=",.0f", secondary_y=False, gridcolor="#334155", linecolor="#475569", tickfont=dict(color="#cbd5e1"))
+            fig_bal.update_yaxes(title_text="공매도 순보유 잔고금액 (억원)", tickformat=",.2f", secondary_y=True, showgrid=False, linecolor="#475569", tickfont=dict(color="#cbd5e1"))
             
             st.plotly_chart(fig_bal, use_container_width=True)
             
@@ -647,23 +657,33 @@ if login_success:
             )
             
             fig_tr.update_layout(
-                title_text=f"{selected_name} 주가 및 일별 공매도 거래대금 추이",
-                title_x=0.5,
-                title_xanchor="center",
+                template="plotly_dark",
+                paper_bgcolor="#1E293B",
+                plot_bgcolor="#0F172A",
+                title=dict(
+                    text=f"<b>{selected_name} 주가 및 일별 공매도 거래대금 추이</b>",
+                    font=dict(color="#F8FAFC", size=15),
+                    x=0.5,
+                    xanchor="center"
+                ),
                 hovermode="x unified",
                 legend=dict(
                     orientation="h",
                     yanchor="bottom",
                     y=1.02,
                     xanchor="center",
-                    x=0.5
+                    x=0.5,
+                    bgcolor="rgba(30, 41, 59, 0.85)",
+                    bordercolor="#334155",
+                    borderwidth=1,
+                    font=dict(color="#F8FAFC", size=11)
                 ),
                 margin=dict(l=20, r=20, t=80, b=20),
                 height=480
             )
-            fig_tr.update_xaxes(title_text="날짜", type='category', tickangle=-45)
-            fig_tr.update_yaxes(title_text="주가 (원)", tickformat=",.0f", secondary_y=False)
-            fig_tr.update_yaxes(title_text="공매도 거래대금 (억원)", tickformat=",.2f", secondary_y=True)
+            fig_tr.update_xaxes(title_text="날짜", type='category', tickangle=-45, gridcolor="#334155", linecolor="#475569", tickfont=dict(color="#cbd5e1"))
+            fig_tr.update_yaxes(title_text="주가 (원)", tickformat=",.0f", secondary_y=False, gridcolor="#334155", linecolor="#475569", tickfont=dict(color="#cbd5e1"))
+            fig_tr.update_yaxes(title_text="공매도 거래대금 (억원)", tickformat=",.2f", secondary_y=True, showgrid=False, linecolor="#475569", tickfont=dict(color="#cbd5e1"))
             
             st.plotly_chart(fig_tr, use_container_width=True)
             
