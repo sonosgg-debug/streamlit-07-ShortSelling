@@ -485,7 +485,7 @@ with st.sidebar:
         st.error("종목 정보를 로드할 수 없습니다.")
         st.stop()
 
-    # 기간 선택
+    # 조회 기간
     periods = ["1W", "2W", "1M", "3M", "6M", "1Y", "YTD"]
     default_period_idx = periods.index("3M") if "3M" in periods else 0
     selected_period = st.selectbox("조회 기간", periods, index=default_period_idx)
