@@ -20,7 +20,7 @@ from pykrx.website.comm.auth import build_krx_session, set_auth_session
 load_dotenv()
 
 # 웹 페이지 레이아웃 설정
-st.set_page_config(page_title="한국증시 개별종목 공매도 현황", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="개별종목 공매도 현황", layout="wide", initial_sidebar_state="expanded")
 
 # 사이드바 접기/펼치기 버튼 상시 표시 및 모바일 대비 강화 CSS
 st.markdown("""
