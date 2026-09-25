@@ -587,7 +587,12 @@ if login_success:
     # 조회 날짜 계산
     start_date, end_date = calculate_dates(selected_period)
     
-    st.markdown(f"<h3 style='color: #BDC1C6; font-size: 1.25rem; font-weight: 600; margin-top: 10px; margin-bottom: 10px;'>{selected_name} ({selected_ticker}) - {selected_period} 공매도 분석</h3>", unsafe_allow_html=True)
+    st.markdown(
+        f"<div style='font-size: 1.20rem; font-weight: 700; color: #8AB4F8; margin: 20px 0 10px 0; display: flex; align-items: center; gap: 8px;'>"
+        f"<span>📊</span> {selected_name} ({selected_ticker}) - {selected_period} 공매도 분석"
+        f"</div>",
+        unsafe_allow_html=True
+    )
     
     tab_balance, tab_trading = st.tabs([
         "📊 공매도 순보유잔고 (T+2 지연공시)", 
@@ -709,7 +714,12 @@ if login_success:
             st.plotly_chart(fig_bal, use_container_width=True)
             
             # 일별 데이터 상세 테이블
-            st.markdown("<h4 style='color: #BDC1C6; font-size: 1.05rem; font-weight: 600; margin-top: 20px; margin-bottom: 5px;'>📝 공매도 순보유잔고 일별 상세</h4>", unsafe_allow_html=True)
+            st.markdown(
+                "<div style='font-size: 1.00rem; font-weight: 600; color: #E2E8F0; margin: 14px 0 6px 0; display: flex; align-items: center; gap: 6px;'>"
+                "<span>📝</span> 공매도 순보유잔고 일별 상세"
+                "</div>",
+                unsafe_allow_html=True
+            )
             st.markdown("<div style='font-size: 0.8rem; color: #94a3b8; margin-bottom: 12px;'>※ 최근 일자의 결측치('-')는 거래소 T+2 공시 대기 중인 정상 상태입니다.</div>", unsafe_allow_html=True)
             
             display_cols_bal = [
@@ -820,7 +830,12 @@ if login_success:
             st.plotly_chart(fig_tr, use_container_width=True)
             
             # 일별 공매도 거래 상세 테이블
-            st.markdown("<h4 style='color: #BDC1C6; font-size: 1.05rem; font-weight: 600; margin-top: 20px; margin-bottom: 5px;'>📝 일별 공매도 거래실적 상세</h4>", unsafe_allow_html=True)
+            st.markdown(
+                "<div style='font-size: 1.00rem; font-weight: 600; color: #E2E8F0; margin: 14px 0 6px 0; display: flex; align-items: center; gap: 6px;'>"
+                "<span>📝</span> 일별 공매도 거래실적 상세"
+                "</div>",
+                unsafe_allow_html=True
+            )
             
             display_cols_tr = [
                 '주가', 
