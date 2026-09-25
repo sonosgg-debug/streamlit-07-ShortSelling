@@ -1,9 +1,9 @@
 setuptools==69.5.1
-streamlit
-pandas
+streamlit>=1.35.0
+pandas>=2.0.0
 numpy
 plotly
 python-dotenv
-pykrx==1.2.8
+pykrx>=1.2.0
 cryptography
 python-dateutil

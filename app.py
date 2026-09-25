@@ -16,6 +16,21 @@ from pykrx import stock
 from pykrx.website.krx.market.ticker import StockTicker
 from pykrx.website.comm.auth import build_krx_session, set_auth_session
 
+STANDARD_CHART_THEME = {
+    'paper_bgcolor': '#1E293B',    # Tailwind Slate-800 (외곽 카드 배경)
+    'plot_bgcolor': '#0F172A',     # Tailwind Slate-900 (내부 딥 블랙 플롯)
+    'text_main': '#F8FAFC',        # 타이틀/헤더 텍스트 (순백색)
+    'text_body': '#E2E8F0',        # 본문 및 축 라벨 (부드러운 화이트)
+    'text_muted': '#CBD5E1',       # 축 눈금 수치 텍스트 (Slate-300)
+    'grid_color': '#334155',       # 그리드 격자선 (Slate-700)
+    'border_color': '#475569',     # 축 기준선 (Slate-600)
+    'legend_bg': 'rgba(30, 41, 59, 0.85)',
+    'legend_border': '#334155',
+    'hover_bg': 'rgba(15, 23, 42, 0.9)',
+    'hover_border': '#334155'
+}
+
+
 # .env 파일 로드
 load_dotenv()
 
@@ -25,6 +40,11 @@ st.set_page_config(page_title="개별종목 공매도 현황", layout="wide", in
 # 사이드바 접기/펼치기 버튼 상시 표시 및 모바일 대비 강화 CSS
 st.markdown("""
 <style>
+    /* Streamlit 고정 상단 헤더 배경 투명화 */
+    header[data-testid="stHeader"] {
+        background: transparent !important;
+    }
+
     /* 메인 콘텐츠 상단 여백 규격화 */
     .main .block-container,
     [data-testid="stMainBlockContainer"],
@@ -233,8 +253,41 @@ st.markdown("""
 # -----------------------------------------------------------------------------
 # 1. 날짜 연산 함수
 # -----------------------------------------------------------------------------
+def get_latest_expected_trading_day(target_date: str = None) -> str:
+    """
+    가장 최근 거래 완료된 실제 영업일 YYYY-MM-DD 반환.
+    - target_date가 전달된 경우: 해당 날짜 기준 (또는 직전 영업일)
+    - target_date가 없는 경우: KST 기준 15:45 이전이거나 오늘이 주말/새벽이면 직전 마감 거래일 반환
+    """
+    from datetime import datetime, timezone, timedelta
+    now_kst = datetime.now(timezone(timedelta(hours=9)))
+    if target_date:
+        try:
+            clean_date = str(target_date).replace('-', '')
+            dt = datetime.strptime(clean_date, "%Y%m%d").replace(tzinfo=timezone(timedelta(hours=9)))
+        except Exception:
+            dt = now_kst
+    else:
+        dt = now_kst
+
+    # 평일 15:45 이후에만 당일 종가 확정
+    if dt.weekday() < 5 and (dt.hour > 15 or (dt.hour == 15 and dt.minute >= 45)):
+        return dt.strftime("%Y-%m-%d")
+
+    # 장전, 새벽, 주말: 직전 마감 거래일 산출
+    if dt.weekday() == 0:    # 월요일 장전 -> 지난주 금요일 (3일 전)
+        days_back = 3
+    elif dt.weekday() == 6:  # 일요일 -> 지난주 금요일 (2일 전)
+        days_back = 2
+    elif dt.weekday() == 5:  # 토요일 -> 지난주 금요일 (1일 전)
+        days_back = 1
+    else:                    # 화~금 장전/새벽 -> 전일 (1일 전)
+        days_back = 1
+
+    return (dt - timedelta(days=days_back)).strftime("%Y-%m-%d")
+
 def calculate_dates(period):
-    today = datetime.date.today()
+    today = datetime.datetime.strptime(get_latest_expected_trading_day(), "%Y-%m-%d").date()
     
     if period == "1W":
         start_date = today - datetime.timedelta(weeks=1)
@@ -486,7 +539,7 @@ with st.sidebar:
         st.warning("⚠️ KRX 로그인 정보 입력이 필요합니다.")
 
     st.markdown("<hr style='border: 0; height: 1px; background-color: #334155; margin: 16px 0;'>", unsafe_allow_html=True)
-    st.subheader("🎯 조회 조건")
+    st.markdown("<div style='font-size: 0.95rem; font-weight: 700; color: #e2e8f0; margin-bottom: 6px;'>🎯 조회 조건</div>", unsafe_allow_html=True)
 
     # 종목 로드
     tickers_df = load_stock_tickers()
@@ -626,8 +679,8 @@ if login_success:
             
             fig_bal.update_layout(
                 template="plotly_dark",
-                paper_bgcolor="#1E293B",
-                plot_bgcolor="#0F172A",
+                paper_bgcolor=STANDARD_CHART_THEME['paper_bgcolor'],
+                plot_bgcolor=STANDARD_CHART_THEME['plot_bgcolor'],
                 title=dict(
                     text=f"<b>{selected_name} 주가 및 공매도 순보유 잔고금액 추이</b>",
                     font=dict(color="#F8FAFC", size=15),
@@ -737,8 +790,8 @@ if login_success:
             
             fig_tr.update_layout(
                 template="plotly_dark",
-                paper_bgcolor="#1E293B",
-                plot_bgcolor="#0F172A",
+                paper_bgcolor=STANDARD_CHART_THEME['paper_bgcolor'],
+                plot_bgcolor=STANDARD_CHART_THEME['plot_bgcolor'],
                 title=dict(
                     text=f"<b>{selected_name} 주가 및 일별 공매도 거래대금 추이</b>",
                     font=dict(color="#F8FAFC", size=15),
